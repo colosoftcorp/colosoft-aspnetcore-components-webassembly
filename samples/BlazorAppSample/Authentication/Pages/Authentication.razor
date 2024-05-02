@@ -1,0 +1,40 @@
+﻿@page "/authentication/{action}"
+@attribute [AllowAnonymous]
+
+@using Colosoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.Authorization
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject IAccessTokenProvider AccessTokenProvider
+@inject ILoggerFactory LoggerFactory;
+
+<RemoteAuthenticatorView
+    Action="@Action"
+    OnLogOutSucceeded="@LogOutSucceded"/>
+
+@code {
+    private ILogger? logger;
+    private RemoteAuthenticationState? state;
+
+    private ILogger Logger
+    {
+        get
+        {
+            if (this.logger == null)
+            {
+                this.logger = this.LoggerFactory.CreateLogger<Authentication>();
+            }
+
+            return this.logger;
+        }
+    }
+
+    [Parameter] public string? Action { get; set; }
+
+    private void LogOutSucceded(RemoteAuthenticationState state)
+    {
+        this.Logger.LogInformation("LogOutSucceded");
+
+        Navigation.NavigateTo("/");
+    }
+}

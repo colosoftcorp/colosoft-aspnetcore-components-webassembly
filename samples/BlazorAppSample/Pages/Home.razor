@@ -1,0 +1,19 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Colosoft.AspNetCore.Components.WebAssembly.Authentication
+@inject NavigationManager Navigation
+@attribute [Authorize]
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<a href="#" @onclick="() => Exit()">Logout</a>
+@code {
+    public void Exit()
+    {
+        Navigation.NavigateToLogout("authentication/logout", null);
+    }
+}

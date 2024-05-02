@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+	<PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+		<IsShippingPackage>true</IsShippingPackage>
+		<IsTrimmable>true</IsTrimmable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<EnableAOTAnalyzer>false</EnableAOTAnalyzer>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.4" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="Colosoft.AspNetCore.Components.WebAssembly.Authentication.Test" />
+	</ItemGroup>
+
+	<PropertyGroup>
+		<InteropWorkingDir>$(MSBuildThisFileDirectory)Interop\</InteropWorkingDir>
+		<ResolveStaticWebAssetsInputsDependsOn>
+			IncludeCompileInteropOutput;
+			$(ResolveStaticWebAssetsInputsDependsOn)
+		</ResolveStaticWebAssetsInputsDependsOn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Content Update="$(InteropWorkingDir)**" Pack="false" />
+	</ItemGroup>
+
+	<Target Name="IncludeCompileInteropOutput">
+		<ItemGroup>
+			<_InteropBuildOutput Include="$(InteropWorkingDir)dist\$(Configuration)\**" Exclude="$(InteropWorkingDir)dist\.gitignore" />
+		</ItemGroup>
+
+		<DefineStaticWebAssets Condition="'@(_InteropBuildOutput)' != ''" SourceType="Computed" SourceId="$(PackageId)" ContentRoot="$(InteropWorkingDir)dist\$(Configuration)\" BasePath="_content/$(PackageId)" CandidateAssets="@(_InteropBuildOutput)">
+			<Output TaskParameter="Assets" ItemName="_InteropBuildStaticWebAsset" />
+		</DefineStaticWebAssets>
+
+		<!--<DefineStaticWebAssetEndpoints Condition="'@(_InteropBuildOutput)' != ''" CandidateAssets="@(_InteropBuildStaticWebAsset)" ExistingEndpoints="@()" ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+			<Output TaskParameter="Endpoints" ItemName="_InteropBuildStaticWebAssetEndpoint" />
+		</DefineStaticWebAssetEndpoints>-->
+
+		<ItemGroup>
+			<StaticWebAsset Include="@(_InteropBuildStaticWebAsset)" />
+			<StaticWebAssetEndpoint Include="@(_InteropBuildStaticWebAssetEndpoint)" />
+			<_InteropBuildOutput Include="$(InteropWorkingDir)dist\$(Configuration)\**" Exclude="$(InteropWorkingDir)dist\.gitignore" />
+			<FileWrites Include="$(_InteropBuildOutput)" />
+		</ItemGroup>
+	</Target>
+
+	<Target Name="Compile JS" BeforeTargets="BeforeBuild">
+		<Exec Command="npm install" WorkingDirectory="Interop" />
+		<Exec Command="npm run build" WorkingDirectory="Interop" />
+	</Target>
+
+</Project>
