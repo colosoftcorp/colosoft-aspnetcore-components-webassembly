@@ -22,7 +22,7 @@ namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication.Test.Logging
         {
             get
             {
-                return this.Formatter!(this.State!, Exception!);
+                return this.Formatter!(this.State!, this.Exception!);
             }
         }
     }

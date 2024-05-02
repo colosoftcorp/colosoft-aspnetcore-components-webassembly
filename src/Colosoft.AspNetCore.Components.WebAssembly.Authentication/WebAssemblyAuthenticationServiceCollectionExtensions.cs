@@ -1,13 +1,13 @@
-using Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 using Colosoft.AspNetCore.Components.WebAssembly.Authentication.Internal;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using static Microsoft.AspNetCore.Internal.LinkerFlags;
 
-namespace Microsoft.Extensions.DependencyInjection;
+namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 
 public static class WebAssemblyAuthenticationServiceCollectionExtensions
 {

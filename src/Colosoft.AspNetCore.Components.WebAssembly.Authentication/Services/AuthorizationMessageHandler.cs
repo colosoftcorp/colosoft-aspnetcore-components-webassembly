@@ -16,7 +16,9 @@ public class AuthorizationMessageHandler : DelegatingHandler, IDisposable
     private readonly AuthenticationStateChangedHandler? authenticationStateChangedHandler;
     private AccessToken? lastToken;
     private AuthenticationHeaderValue? cachedHeader;
+#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
     private Uri[]? authorizedUris;
+#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
     private AccessTokenRequestOptions? tokenOptions;
 
     public AuthorizationMessageHandler(
