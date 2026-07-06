@@ -20,9 +20,7 @@ public class RemoteAuthenticationService<
     where TProviderOptions : new()
     where TAccount : RemoteUserAccount
 {
-#pragma warning disable S2743 // Static fields should not be used in generic types
     private static readonly TimeSpan UserCacheRefreshInterval = TimeSpan.FromSeconds(60);
-#pragma warning restore S2743 // Static fields should not be used in generic types
     private readonly RemoteAuthenticationServiceJavaScriptLoggingOptions loggingOptions;
 
     private bool initialized;
@@ -63,7 +61,10 @@ public class RemoteAuthenticationService<
         RemoteAuthenticationContext<TRemoteAuthenticationState> context)
     {
         await this.EnsureAuthService();
-        var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteAuthenticationResult<TRemoteAuthenticationState>>("AuthenticationService.signIn", context);
+        var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteAuthenticationResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.signIn",
+            context);
+
         await this.UpdateUserOnSuccess(result);
 
         return result;
@@ -73,7 +74,10 @@ public class RemoteAuthenticationService<
         RemoteAuthenticationContext<TRemoteAuthenticationState> context)
     {
         await this.EnsureAuthService();
-        var result = await this.JsRuntime.InvokeAsync<RemoteAuthenticationResult<TRemoteAuthenticationState>>("AuthenticationService.completeSignIn", context.Url);
+        var result = await this.JsRuntime.InvokeAsync<RemoteAuthenticationResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.completeSignIn",
+            context.Url);
+
         await this.UpdateUserOnSuccess(result);
 
         return result;
@@ -83,18 +87,36 @@ public class RemoteAuthenticationService<
         RemoteAuthenticationContext<TRemoteAuthenticationState> context)
     {
         await this.EnsureAuthService();
-        var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteAuthenticationResult<TRemoteAuthenticationState>>("AuthenticationService.signOut", context);
+        var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteAuthenticationResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.signOut",
+            context);
+
         await this.UpdateUserOnSuccess(result);
 
         return result;
     }
 
-    /// <inheritdoc />
     public virtual async Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> CompleteSignOutAsync(
         RemoteAuthenticationContext<TRemoteAuthenticationState> context)
     {
         await this.EnsureAuthService();
-        var result = await this.JsRuntime.InvokeAsync<RemoteAuthenticationResult<TRemoteAuthenticationState>>("AuthenticationService.completeSignOut", context.Url);
+        var result = await this.JsRuntime.InvokeAsync<RemoteAuthenticationResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.completeSignOut",
+            context.Url);
+
+        await this.UpdateUserOnSuccess(result);
+
+        return result;
+    }
+
+    public virtual async Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SilentRedirectAsync(
+        RemoteAuthenticationContext<TRemoteAuthenticationState> context)
+    {
+        await this.EnsureAuthService();
+        var result = await this.JsRuntime.InvokeAsync<RemoteAuthenticationResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.silentRedirect",
+            context);
+
         await this.UpdateUserOnSuccess(result);
 
         return result;
@@ -103,7 +125,8 @@ public class RemoteAuthenticationService<
     public virtual async ValueTask<AccessTokenResult> RequestAccessToken()
     {
         await this.EnsureAuthService();
-        var result = await this.JsRuntime.InvokeAsync<InternalAccessTokenResult>("AuthenticationService.getAccessToken");
+        var result = await this.JsRuntime.InvokeAsync<InternalAccessTokenResult>(
+            "AuthenticationService.getAccessToken");
 
         var requestOptions = result.Status == AccessTokenResultStatus.RequiresRedirect
             ? new InteractiveRequestOptions
@@ -128,7 +151,9 @@ public class RemoteAuthenticationService<
         ArgumentNullException.ThrowIfNull(options);
 
         await this.EnsureAuthService();
-        var result = await this.JsRuntime.InvokeAsync<InternalAccessTokenResult>("AuthenticationService.getAccessToken", options);
+        var result = await this.JsRuntime.InvokeAsync<InternalAccessTokenResult>(
+            "AuthenticationService.getAccessToken",
+            options);
 
         var requestOptions = result.Status == AccessTokenResultStatus.RequiresRedirect
             ? new InteractiveRequestOptions
@@ -146,8 +171,6 @@ public class RemoteAuthenticationService<
             requestOptions);
     }
 
-    // JSRuntime.InvokeAsync does not properly annotate all arguments with DynamicallyAccessedMembersAttribute. https://github.com/dotnet/aspnetcore/issues/39839
-    // Calling JsRuntime.InvokeAsync directly results allows the RemoteAuthenticationContext.State getter to be trimmed. https://github.com/dotnet/aspnetcore/issues/49956
     private ValueTask<TResult> JSInvokeWithContextAsync<[DynamicallyAccessedMembers(JsonSerialized)] TContext, [DynamicallyAccessedMembers(JsonSerialized)] TResult>(
         string identifier, TContext context) => this.JsRuntime.InvokeAsync<TResult>(identifier, context);
 
@@ -182,7 +205,11 @@ public class RemoteAuthenticationService<
     {
         if (!this.initialized)
         {
-            await this.JsRuntime.InvokeVoidAsync("AuthenticationService.init", this.Options.ProviderOptions, this.loggingOptions);
+            await this.JsRuntime.InvokeVoidAsync(
+                "AuthenticationService.init",
+                this.Options.ProviderOptions,
+                this.loggingOptions);
+
             this.initialized = true;
         }
     }
@@ -201,6 +228,7 @@ public class RemoteAuthenticationService<
     {
         this.NotifyAuthenticationStateChanged(UpdateAuthenticationState(task));
 
-        static async Task<AuthenticationState> UpdateAuthenticationState(Task<ClaimsPrincipal> futureUser) => new AuthenticationState(await futureUser);
+        static async Task<AuthenticationState> UpdateAuthenticationState(Task<ClaimsPrincipal> futureUser) =>
+            new AuthenticationState(await futureUser);
     }
 }

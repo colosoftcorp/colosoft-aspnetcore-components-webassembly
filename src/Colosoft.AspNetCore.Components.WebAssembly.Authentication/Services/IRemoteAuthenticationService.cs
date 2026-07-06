@@ -16,4 +16,7 @@ public interface IRemoteAuthenticationService<[DynamicallyAccessedMembers(JsonSe
 
     Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> CompleteSignOutAsync(
         RemoteAuthenticationContext<TRemoteAuthenticationState> context);
+
+    Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SilentRedirectAsync(
+        RemoteAuthenticationContext<TRemoteAuthenticationState> context);
 }

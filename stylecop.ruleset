@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<RuleSet Name="Rules for StyleCop.Analyzers" Description="Code analysis rules for StyleCop.Analyzers.csproj." ToolsVersion="17.0">
+<RuleSet Name="Rules for StyleCop.Analyzers" Description="Code analysis rules for StyleCop.Analyzers.csproj." ToolsVersion="18.0">
   <Rules AnalyzerId="AsyncUsageAnalyzers" RuleNamespace="AsyncUsageAnalyzers">
     <Rule Id="UseConfigureAwait" Action="Warning" />
   </Rules>
@@ -70,6 +70,9 @@
     <Rule Id="CS1573" Action="None" />
     <Rule Id="CS1591" Action="None" />
     <Rule Id="CS1712" Action="None" />
+  </Rules>
+  <Rules AnalyzerId="Microsoft.AspNetCore.Components.Analyzers" RuleNamespace="Microsoft.AspNetCore.Components.Analyzers">
+    <Rule Id="BL0007" Action="None" />
   </Rules>
   <Rules AnalyzerId="Microsoft.CodeAnalysis.CSharp.Features" RuleNamespace="Microsoft.CodeAnalysis.CSharp.Features">
     <Rule Id="IDE0003" Action="None" />

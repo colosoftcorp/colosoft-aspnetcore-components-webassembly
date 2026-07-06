@@ -878,17 +878,11 @@ public class RemoteAuthenticatorCoreTests
 
     private class TestRemoteAuthenticationService : RemoteAuthenticationService<RemoteAuthenticationState, RemoteUserAccount, OidcProviderOptions>
     {
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public TestRemoteAuthenticationService(
-#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-#pragma warning disable SA1114 // Parameter list should follow declaration
             IJSRuntime jsRuntime,
-#pragma warning restore SA1114 // Parameter list should follow declaration
             IOptionsSnapshot<RemoteAuthenticationOptions<OidcProviderOptions>> options,
-#pragma warning disable SA1128 // Put constructor initializers on their own line
             TestNavigationManager navigationManager)
             : base(jsRuntime, options, navigationManager, new AccountClaimsPrincipalFactory<RemoteUserAccount>(Mock.Of<IAccessTokenProviderAccessor>()), null)
-#pragma warning restore SA1128 // Put constructor initializers on their own line
         {
         }
 

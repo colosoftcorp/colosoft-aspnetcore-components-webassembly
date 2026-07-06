@@ -497,7 +497,7 @@ public class RemoteAuthenticationServiceTests
         options.UserOptions.NameClaim = "coolName";
         options.ProviderOptions.Authority = "a";
         options.ProviderOptions.ClientId = "a";
-        options.ProviderOptions.DefaultScopes.Add("openid");
+        options.ProviderOptions.Scope.Add("openid");
         options.ProviderOptions.RedirectUri = "https://www.example.com/base/custom-login";
         options.ProviderOptions.PostLogoutRedirectUri = "https://www.example.com/base/custom-logout";
 

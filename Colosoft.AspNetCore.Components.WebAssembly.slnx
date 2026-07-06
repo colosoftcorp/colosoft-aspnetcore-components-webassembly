@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/BlazorAppSample/BlazorAppSample.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Colosoft.AspNetCore.Components.WebAssembly.Authentication/Colosoft.AspNetCore.Components.WebAssembly.Authentication.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Colosoft.AspNetCore.Components.WebAssembly.Authentication.Test/Colosoft.AspNetCore.Components.WebAssembly.Authentication.Test.csproj" />
+  </Folder>
+</Solution>

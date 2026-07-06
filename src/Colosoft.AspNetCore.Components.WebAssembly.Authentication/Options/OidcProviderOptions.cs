@@ -2,29 +2,66 @@ using System.Text.Json.Serialization;
 
 namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 
-public class OidcProviderOptions
+public class OidcProviderOptions : OidcClientOptions
 {
-    public string? Authority { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RedirectMethod { get; set; }
 
-    public string? MetadataUrl { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RedirectTarget { get; set; }
 
-    [JsonPropertyName("client_id")]
-    public string? ClientId { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IframeNotifyParentOrigin { get; set; }
 
-    public IList<string> DefaultScopes { get; } = new List<string> { "openid", "profile" };
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? IframeScriptOrigin { get; set; }
 
-    [JsonPropertyName("redirect_uri")]
-    public string? RedirectUri { get; set; }
+    [JsonPropertyName("silent_redirect_uri")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SilentRedirectUri { get; set; }
 
-    [JsonPropertyName("post_logout_redirect_uri")]
-    public string? PostLogoutRedirectUri { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? SilentRequestTimeoutInSeconds { get; set; }
 
-    [JsonPropertyName("response_type")]
-    public string? ResponseType { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? AutomaticSilentRenew { get; set; }
 
-    [JsonPropertyName("response_mode")]
-    public string? ResponseMode { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ValidateSubOnSilentRenew { get; set; }
 
-    [JsonPropertyName("extraQueryParams")]
-    public IDictionary<string, string> AdditionalProviderParameters { get; } = new Dictionary<string, string>();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IncludeIdTokenInSilentRenew { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MonitorSession { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? MonitorAnonymousSession { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? CheckSessionIntervalInSeconds { get; set; }
+
+    [JsonPropertyName("query_status_response_type")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? QueryStatusResponseType { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? StopCheckSessionOnError { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+#pragma warning disable SA1011 // Closing square brackets should be spaced correctly
+    public string[]? RevokeTokenTypes { get; set; }
+#pragma warning restore SA1011 // Closing square brackets should be spaced correctly
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? RevokeTokensOnSignout { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IncludeIdTokenInSilentSignout { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? AccessTokenExpiringNotificationTimeInSeconds { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxSilentRenewTimeoutRetries { get; set; }
 }

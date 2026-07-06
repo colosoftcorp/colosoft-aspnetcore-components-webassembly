@@ -11,9 +11,7 @@ namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 
 public static class WebAssemblyAuthenticationServiceCollectionExtensions
 {
-#pragma warning disable S4136 // Method overloads should be grouped together
     public static IRemoteAuthenticationBuilder<TRemoteAuthenticationState, TAccount> AddRemoteAuthentication<
-#pragma warning restore S4136 // Method overloads should be grouped together
         [DynamicallyAccessedMembers(JsonSerialized)] TRemoteAuthenticationState,
         [DynamicallyAccessedMembers(JsonSerialized)] TAccount,
         [DynamicallyAccessedMembers(JsonSerialized)] TProviderOptions>(
@@ -37,10 +35,7 @@ public static class WebAssemblyAuthenticationServiceCollectionExtensions
 
         services.TryAddScoped<IRemoteAuthenticationPathsProvider, DefaultRemoteApplicationPathsProvider<TProviderOptions>>();
         services.TryAddScoped<IAccessTokenProviderAccessor, AccessTokenProviderAccessor>();
-#pragma warning disable CS0618 // Type or member is obsolete, we keep it for now for backwards compatibility
         services.TryAddScoped<SignOutSessionStateManager>();
-#pragma warning restore CS0618 // Type or member is obsolete, we keep it for now for backwards compatibility
-
         services.TryAddScoped<AccountClaimsPrincipalFactory<TAccount>>();
 
         return new RemoteAuthenticationBuilder<TRemoteAuthenticationState, TAccount>(services);
@@ -70,13 +65,16 @@ public static class WebAssemblyAuthenticationServiceCollectionExtensions
     }
 
     public static IRemoteAuthenticationBuilder<RemoteAuthenticationState, RemoteUserAccount> AddOidcAuthentication(
-        this IServiceCollection services, Action<RemoteAuthenticationOptions<OidcProviderOptions>> configure)
+        this IServiceCollection services,
+        Action<RemoteAuthenticationOptions<OidcProviderOptions>> configure)
     {
         return AddOidcAuthentication<RemoteAuthenticationState>(services, configure);
     }
 
-    public static IRemoteAuthenticationBuilder<TRemoteAuthenticationState, RemoteUserAccount> AddOidcAuthentication<[DynamicallyAccessedMembers(JsonSerialized)] TRemoteAuthenticationState>(
-        this IServiceCollection services, Action<RemoteAuthenticationOptions<OidcProviderOptions>> configure)
+    public static IRemoteAuthenticationBuilder<TRemoteAuthenticationState, RemoteUserAccount> AddOidcAuthentication<
+        [DynamicallyAccessedMembers(JsonSerialized)] TRemoteAuthenticationState>(
+        this IServiceCollection services,
+        Action<RemoteAuthenticationOptions<OidcProviderOptions>> configure)
         where TRemoteAuthenticationState : RemoteAuthenticationState, new()
     {
         return AddOidcAuthentication<TRemoteAuthenticationState, RemoteUserAccount>(services, configure);

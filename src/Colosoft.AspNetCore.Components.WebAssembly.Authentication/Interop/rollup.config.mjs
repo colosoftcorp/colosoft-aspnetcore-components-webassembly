@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 export default createBaseConfig({
   inputOutputMap: {
-    'AuthenticationService': './AuthenticationService.ts',
+    'AuthenticationService': './authentication-service.ts',
   },
   dir: __dirname,
   updateConfig: (config, environment, _, input) => {

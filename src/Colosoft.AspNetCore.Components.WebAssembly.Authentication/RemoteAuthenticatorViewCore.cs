@@ -10,10 +10,12 @@ namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(JsonSerialized)] TAuthenticationState> : ComponentBase
     where TAuthenticationState : RemoteAuthenticationState
 {
-#pragma warning disable S2743 // Static fields should not be used in generic types
     private static readonly NavigationOptions AuthenticationNavigationOptions =
-#pragma warning restore S2743 // Static fields should not be used in generic types
-        new() { ReplaceHistoryEntry = true, ForceLoad = false };
+        new()
+        {
+            ReplaceHistoryEntry = true,
+            ForceLoad = false,
+        };
 
     private RemoteAuthenticationApplicationPathsOptions? applicationPaths;
     private string? action;
@@ -21,9 +23,7 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
     private InteractiveRequestOptions? cachedRequest;
 
     [Parameter]
-#pragma warning disable BL0007 // Component parameters should be auto properties
     public string? Action
-#pragma warning restore BL0007 // Component parameters should be auto properties
     {
         get => this.action;
         set => this.action = value?.ToLowerInvariant();
@@ -60,15 +60,16 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
     public RenderFragment LogOutSucceeded { get; set; } = DefaultLoggedOutFragment;
 
     [Parameter]
+    public RenderFragment SilentRedirect { get; set; } = DefaultSilentRedirectFragment;
+
+    [Parameter]
     public EventCallback<TAuthenticationState> OnLogInSucceeded { get; set; }
 
     [Parameter]
     public EventCallback<TAuthenticationState> OnLogOutSucceeded { get; set; }
 
     [Parameter]
-#pragma warning disable BL0007 // Component parameters should be auto properties
     public RemoteAuthenticationApplicationPathsOptions ApplicationPaths
-#pragma warning restore BL0007 // Component parameters should be auto properties
     {
         get => this.applicationPaths ?? this.RemoteApplicationPathsProvider.ApplicationPaths;
         set => this.applicationPaths = value!;
@@ -86,10 +87,8 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
     [Inject]
     internal AuthenticationStateProvider AuthenticationProvider { get; set; } = default!;
 
-#pragma warning disable CS0618 // Type or member is obsolete, we keep it for now for backwards compatibility
     [Inject]
     internal SignOutSessionStateManager SignOutManager { get; set; } = default!;
-#pragma warning restore CS0618 // Type or member is obsolete, we keep it for now for backwards compatibility
 
     [Inject]
     internal ILogger<RemoteAuthenticatorViewCore<TAuthenticationState>> Logger { get; set; } = default!;
@@ -167,6 +166,13 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
         builder.CloseElement();
     }
 
+    private static void DefaultSilentRedirectFragment(RenderTreeBuilder builder)
+    {
+        builder.OpenElement(0, "p");
+        builder.AddContent(1, "Processing silent redirect...");
+        builder.CloseElement();
+    }
+
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
         base.BuildRenderTree(builder);
@@ -199,17 +205,18 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
             case RemoteAuthenticationActions.LogOutSucceeded:
                 builder.AddContent(0, this.LogOutSucceeded);
                 break;
+            case RemoteAuthenticationActions.SilentRedirect:
+                builder.AddContent(0, this.SilentRedirect);
+                break;
             default:
                 throw new InvalidOperationException($"Invalid action '{this.Action}'.");
         }
     }
 
-    /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
         if (this.lastHandledAction == this.Action)
         {
-            // Avoid processing the same action more than once.
             return;
         }
 
@@ -219,6 +226,9 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
         {
             case RemoteAuthenticationActions.LogIn:
                 await this.ProcessLogIn(this.GetReturnUrl(state: null));
+                break;
+            case RemoteAuthenticationActions.SilentRedirect:
+                await this.ProcessSilentRedirectCallback(this.GetReturnUrl(state: null));
                 break;
             case RemoteAuthenticationActions.LogInCallback:
                 await this.ProcessLogInCallback();
@@ -268,11 +278,12 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
     {
         this.AuthenticationState.ReturnUrl = returnUrl;
         var interactiveRequest = this.GetCachedNavigationState();
-        var result = await this.AuthenticationService.SignInAsync(new RemoteAuthenticationContext<TAuthenticationState>
-        {
-            State = this.AuthenticationState,
-            InteractiveRequest = interactiveRequest,
-        });
+        var result = await this.AuthenticationService.SignInAsync(
+            new RemoteAuthenticationContext<TAuthenticationState>
+            {
+                State = this.AuthenticationState,
+                InteractiveRequest = interactiveRequest,
+            });
 
         switch (result.Status)
         {
@@ -294,11 +305,14 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
             case RemoteAuthenticationStatus.Failure:
                 Log.LoginFailed(this.Logger, result.ErrorMessage!);
                 Log.NavigatingToUrl(this.Logger, this.ApplicationPaths.LogInFailedPath);
-#pragma warning disable SA1101 // Prefix local calls with this
                 this.Navigation.NavigateTo(
                     this.ApplicationPaths.LogInFailedPath,
-                    AuthenticationNavigationOptions with { HistoryEntryState = result.ErrorMessage });
-#pragma warning restore SA1101 // Prefix local calls with this
+                    new NavigationOptions
+                    {
+                        ReplaceHistoryEntry = true,
+                        ForceLoad = false,
+                        HistoryEntryState = result.ErrorMessage,
+                    });
                 break;
             case RemoteAuthenticationStatus.OperationCompleted:
             default:
@@ -313,8 +327,6 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
         switch (result.Status)
         {
             case RemoteAuthenticationStatus.Redirect:
-                // There should not be any redirects as the only time CompleteSignInAsync finishes
-                // is when we are doing a redirect sign in flow.
                 throw new InvalidOperationException("Should not redirect.");
             case RemoteAuthenticationStatus.Success:
                 Log.LoginRedirectCompletedSuccessfully(this.Logger);
@@ -333,11 +345,14 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
             case RemoteAuthenticationStatus.Failure:
                 Log.LoginCallbackFailed(this.Logger, result.ErrorMessage!);
                 Log.NavigatingToUrl(this.Logger, this.ApplicationPaths.LogInFailedPath);
-#pragma warning disable SA1101 // Prefix local calls with this
                 this.Navigation.NavigateTo(
                     this.ApplicationPaths.LogInFailedPath,
-                    AuthenticationNavigationOptions with { HistoryEntryState = result.ErrorMessage });
-#pragma warning restore SA1101 // Prefix local calls with this
+                    new NavigationOptions
+                    {
+                        ReplaceHistoryEntry = true,
+                        ForceLoad = false,
+                        HistoryEntryState = result.ErrorMessage,
+                    });
                 break;
             default:
                 throw new InvalidOperationException($"Invalid authentication result status '{result.Status}'.");
@@ -347,14 +362,17 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
     private async Task ProcessLogOut(string returnUrl)
     {
         if ((this.Navigation.HistoryEntryState != null && !this.ValidateSignOutRequestState()) ||
-
-            // For backcompat purposes, keep SignOutManager working, even though we now use the history.state for this.
             (this.Navigation.HistoryEntryState == null && !await this.SignOutManager.ValidateSignOutState()))
         {
             Log.LogoutOperationInitiatedExternally(this.Logger);
-#pragma warning disable SA1101 // Prefix local calls with this
-            this.Navigation.NavigateTo(this.ApplicationPaths.LogOutFailedPath, AuthenticationNavigationOptions with { HistoryEntryState = "The logout was not initiated from within the page." });
-#pragma warning restore SA1101 // Prefix local calls with this
+            this.Navigation.NavigateTo(
+                this.ApplicationPaths.LogOutFailedPath,
+                new NavigationOptions
+                {
+                    ReplaceHistoryEntry = true,
+                    ForceLoad = false,
+                    HistoryEntryState = "The logout was not initiated from within the page.",
+                });
             return;
         }
 
@@ -391,9 +409,14 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
                 case RemoteAuthenticationStatus.Failure:
                     Log.LogoutFailed(this.Logger, result.ErrorMessage!);
                     Log.NavigatingToUrl(this.Logger, this.ApplicationPaths.LogOutFailedPath);
-#pragma warning disable SA1101 // Prefix local calls with this
-                    this.Navigation.NavigateTo(this.ApplicationPaths.LogOutFailedPath, AuthenticationNavigationOptions with { HistoryEntryState = result.ErrorMessage });
-#pragma warning restore SA1101 // Prefix local calls with this
+                    this.Navigation.NavigateTo(
+                        this.ApplicationPaths.LogOutFailedPath,
+                        new NavigationOptions
+                        {
+                            ReplaceHistoryEntry = true,
+                            ForceLoad = false,
+                            HistoryEntryState = result.ErrorMessage,
+                        });
                     break;
                 default:
                     throw new InvalidOperationException($"Invalid authentication result status.");
@@ -412,8 +435,6 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
         switch (result.Status)
         {
             case RemoteAuthenticationStatus.Redirect:
-                // There should not be any redirects as the only time completeAuthentication finishes
-                // is when we are doing a redirect sign in flow.
                 throw new InvalidOperationException("Should not redirect.");
             case RemoteAuthenticationStatus.Success:
                 Log.LogoutRedirectCompletedSuccessfully(this.Logger);
@@ -431,13 +452,31 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
                 break;
             case RemoteAuthenticationStatus.Failure:
                 Log.LogoutCallbackFailed(this.Logger, result.ErrorMessage!);
-#pragma warning disable SA1101 // Prefix local calls with this
-                this.Navigation.NavigateTo(this.ApplicationPaths.LogOutFailedPath, AuthenticationNavigationOptions with { HistoryEntryState = result.ErrorMessage });
-#pragma warning restore SA1101 // Prefix local calls with this
+                this.Navigation.NavigateTo(
+                    this.ApplicationPaths.LogOutFailedPath,
+                    new NavigationOptions
+                    {
+                        ReplaceHistoryEntry = true,
+                        ForceLoad = false,
+                        HistoryEntryState = result.ErrorMessage,
+                    });
                 break;
             default:
                 throw new InvalidOperationException($"Invalid authentication result status.");
         }
+    }
+
+    private async Task ProcessSilentRedirectCallback(string returnUrl)
+    {
+        this.AuthenticationState.ReturnUrl = returnUrl;
+        var interactiveRequest = this.GetCachedNavigationState();
+
+        await this.AuthenticationService.SilentRedirectAsync(
+            new RemoteAuthenticationContext<TAuthenticationState>
+            {
+                State = this.AuthenticationState,
+                InteractiveRequest = interactiveRequest,
+            });
     }
 
     private string GetReturnUrl(TAuthenticationState? state, string? defaultReturnUrl = null)
@@ -481,11 +520,21 @@ public partial class RemoteAuthenticatorViewCore<[DynamicallyAccessedMembers(Jso
             registerUrl,
             new Dictionary<string, object?> { ["returnUrl"] = loginUrl });
 
-#pragma warning disable SA1101 // Prefix local calls with this
-        this.Navigation.NavigateTo(navigationUrl, AuthenticationNavigationOptions with { ForceLoad = true });
-#pragma warning restore SA1101 // Prefix local calls with this
+        this.Navigation.NavigateTo(
+            navigationUrl,
+            new NavigationOptions
+            {
+                ReplaceHistoryEntry = true,
+                ForceLoad = true,
+            });
     }
 
     private void RedirectToProfile() =>
-        this.Navigation.NavigateTo(this.Navigation.ToAbsoluteUri(this.ApplicationPaths.RemoteProfilePath).AbsoluteUri, new NavigationOptions { ReplaceHistoryEntry = true, ForceLoad = true });
+        this.Navigation.NavigateTo(
+            this.Navigation.ToAbsoluteUri(this.ApplicationPaths.RemoteProfilePath).AbsoluteUri,
+            new NavigationOptions
+            {
+                ReplaceHistoryEntry = true,
+                ForceLoad = true,
+            });
 }

@@ -7,27 +7,9 @@ import replace from '@rollup/plugin-replace';
 import filesize from 'rollup-plugin-filesize';
 import { env } from 'process';
 
-/**
- * @callback UpdateConfigFunction
- * @param {import('rollup').RollupOptions} config - The Rollup configuration to update.
- * @param {'development' | 'production' } environment - The environment we are compiling for ().
- * @param {string} output - The bundle we are generating.
- * @param {string} input - The entry point for the bundle.
- */
-
-/**
- * @typedef {Object} BaseOptions
- * @property {Object.<string, string>} inputOutputMap - An object that maps a string key to a string.
- * @property {string} dir - The directory for the config that we are creating.
- * @property {UpdateConfigFunction} updateConfig - A function that updates the configuration.
- */
-
-/**
- *
- * @param {BaseOptions} options
- * @returns
- */
 export default function createBaseConfig({ inputOutputMap, dir, updateConfig }) {
+
+  const oidcClientTsEsmPath = path.join(dir, 'node_modules', 'oidc-client-ts', 'dist', 'esm', 'oidc-client-ts.js');
 
   return ({ environment }) => {
 
@@ -42,8 +24,25 @@ export default function createBaseConfig({ inputOutputMap, dir, updateConfig }) 
         entryFileNames: '[name].js',
       },
       plugins: [
-        resolve(),
-        commonjs(),
+        {
+          name: 'resolve-oidc-client-ts-esm',
+          resolveId(source) {
+            if (source === 'oidc-client-ts' || source === 'oidc-client-ts/dist/esm/oidc-client-ts.js') {
+              return oidcClientTsEsmPath;
+            }
+
+            return null;
+          }
+        },
+        resolve({
+          browser: true,
+          preferBuiltins: false,
+          mainFields: ['browser', 'module', 'main'],
+          exportConditions: ['browser', 'import', 'default']
+        }),
+        commonjs({
+          transformMixedEsModules: true
+        }),
         typescript({
           tsconfig: path.join(dir, 'tsconfig.json')
         }),

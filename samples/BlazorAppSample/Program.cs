@@ -2,6 +2,7 @@ using BlazorAppSample;
 using Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.Options;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -17,9 +18,13 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddOptions();
 builder.Services.AddAuthorizationCore();
 
+builder.Services
+    .AddScoped<
+        IPostConfigureOptions<RemoteAuthenticationOptions<OidcProviderOptions>>,
+        OidcOptionsConfiguration>();
+
 builder.Services.AddOidcAuthentication(options =>
 {
-    options.ProviderOptions.ResponseMode = "fragment";
     builder.Configuration.Bind("Local", options.ProviderOptions);
 });
 

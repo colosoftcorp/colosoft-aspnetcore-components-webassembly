@@ -20,5 +20,7 @@ public static class RemoteAuthenticationActions
 
     public const string LogOutSucceeded = "logged-out";
 
+    public const string SilentRedirect = "silent-redirect";
+
     public static bool IsAction(string action, string candidate) => action != null && string.Equals(action, candidate, System.StringComparison.OrdinalIgnoreCase);
 }

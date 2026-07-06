@@ -22,7 +22,7 @@
     "npm": ">=9.3.1"
   },
   "dependencies": {
-    "oidc-client": "^1.11.5"
+    "oidc-client-ts": "^3.5.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
