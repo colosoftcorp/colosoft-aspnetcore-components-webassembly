@@ -40,9 +40,9 @@
 			<Output TaskParameter="Assets" ItemName="_InteropBuildStaticWebAsset" />
 		</DefineStaticWebAssets>
 
-		<!--<DefineStaticWebAssetEndpoints Condition="'@(_InteropBuildOutput)' != ''" CandidateAssets="@(_InteropBuildStaticWebAsset)" ExistingEndpoints="@()" ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+		<DefineStaticWebAssetEndpoints Condition="'@(_InteropBuildOutput)' != ''" CandidateAssets="@(_InteropBuildStaticWebAsset)" ExistingEndpoints="@()" ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
 			<Output TaskParameter="Endpoints" ItemName="_InteropBuildStaticWebAssetEndpoint" />
-		</DefineStaticWebAssetEndpoints>-->
+		</DefineStaticWebAssetEndpoints>
 
 		<ItemGroup>
 			<StaticWebAsset Include="@(_InteropBuildStaticWebAsset)" />
