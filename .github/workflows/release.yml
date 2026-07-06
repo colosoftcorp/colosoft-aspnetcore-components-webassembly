@@ -16,13 +16,13 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Clean
-        run: dotnet clean -c Release
+        run: dotnet clean .\Colosoft.AspNetCore.Components.WebAssembly.slnx -c Release
 
       - name: Build
-        run: dotnet build -c Release
+        run: dotnet build .\Colosoft.AspNetCore.Components.WebAssembly.slnx -c Release
 
       - name: Pack
-        run: dotnet pack -c Release
+        run: dotnet pack .\Colosoft.AspNetCore.Components.WebAssembly.slnx -c Release
         
       - name: Publish to Nuget.org
         run: dotnet nuget push .\output\Release\*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
