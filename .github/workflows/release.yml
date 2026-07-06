@@ -10,10 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Setup dotnet 8.0
+      - name: Setup dotnet 10.0
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Clean
         run: dotnet clean .\Colosoft.AspNetCore.Components.WebAssembly.slnx -c Release
