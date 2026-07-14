@@ -1,4 +1,8 @@
-import { type UserManagerSettings, UserManager } from 'oidc-client-ts';
+import {
+  type UserManagerSettings,
+  UserManager,
+  WebStorageStateStore,
+} from 'oidc-client-ts';
 import { AccessTokenRequestOptions } from './access-token-request-options';
 import { AuthenticationResult } from './authentication-result';
 import { AuthenticationContext } from './authentication-context';
@@ -9,6 +13,10 @@ import { JavaScriptLoggingOptions } from './java-script-logging-options';
 import { ManagedLogger } from './managed-logger';
 import { OidcAuthorizeService } from './oidc-authorize-service';
 import { AuthenticationResultStatus } from './authentication-result-status';
+
+interface UserManagerSettingsExtends extends UserManagerSettings {
+  userStoreType: 'LocalStorage' | 'SessionStorage';
+}
 
 export class AuthenticationService {
   static _infrastructureKey =
@@ -197,6 +205,18 @@ export class AuthenticationService {
   }
 
   private static createUserManagerCore(finalSettings: UserManagerSettings) {
+    if (!finalSettings.userStore) {
+      const extend = finalSettings as UserManagerSettingsExtends;
+      if (extend.userStoreType === 'LocalStorage') {
+        finalSettings.userStore = new WebStorageStateStore({
+          store: window.localStorage,
+        });
+      } else if (extend.userStoreType === 'SessionStorage') {
+        finalSettings.userStore = new WebStorageStateStore({
+          store: window.sessionStorage,
+        });
+      }
+    }
     const userManager = new UserManager(finalSettings);
     userManager.events.addUserSignedOut(async () => {
       userManager.removeUser();

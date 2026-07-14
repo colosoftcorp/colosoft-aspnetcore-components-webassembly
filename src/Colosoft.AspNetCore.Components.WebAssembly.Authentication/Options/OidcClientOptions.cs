@@ -102,5 +102,8 @@ namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? OmitScopeWhenRequesting { get; set; }
+
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public OidcClientUserStoreType UserStoreType { get; set; } = OidcClientUserStoreType.LocalStorage;
     }
 }

@@ -12,6 +12,7 @@ namespace BlazorAppSample
         {
             options.ProviderOptions.ResponseType = "code";
             options.ProviderOptions.Scope.Add("offline_access");
+            options.ProviderOptions.Scope.Add("profile");
 
             var redirectUri = options.ProviderOptions.RedirectUri;
             if (redirectUri == null || !Uri.TryCreate(redirectUri, UriKind.Absolute, out _))
