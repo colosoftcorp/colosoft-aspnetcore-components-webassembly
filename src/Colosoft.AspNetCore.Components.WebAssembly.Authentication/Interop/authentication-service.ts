@@ -125,6 +125,10 @@ export class AuthenticationService {
     return AuthenticationService.instance.signIn(context);
   }
 
+  public static createSignInUrl(context: AuthenticationContext) {
+    return AuthenticationService.instance.createSignInUrl(context);
+  }
+
   public static parentSilentRedirect(context: AuthenticationContext) {
     return Promise.resolve({
       status: AuthenticationResultStatus.Success,
@@ -217,7 +221,7 @@ export class AuthenticationService {
         });
       }
     }
-    const userManager = new UserManager(finalSettings);
+    const userManager = new UserManager(finalSettings, undefined, undefined);
     userManager.events.addUserSignedOut(async () => {
       userManager.removeUser();
     });

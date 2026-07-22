@@ -1,3 +1,4 @@
+using Colosoft.AspNetCore.Components.WebAssembly.Authentication.Services;
 using System.Diagnostics.CodeAnalysis;
 using static Microsoft.AspNetCore.Internal.LinkerFlags;
 
@@ -6,7 +7,8 @@ namespace Colosoft.AspNetCore.Components.WebAssembly.Authentication;
 public interface IRemoteAuthenticationService<[DynamicallyAccessedMembers(JsonSerialized)] TRemoteAuthenticationState>
     where TRemoteAuthenticationState : RemoteAuthenticationState
 {
-    Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SignInAsync(RemoteAuthenticationContext<TRemoteAuthenticationState> context);
+    Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SignInAsync(
+        RemoteAuthenticationContext<TRemoteAuthenticationState> context);
 
     Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> CompleteSignInAsync(
         RemoteAuthenticationContext<TRemoteAuthenticationState> context);
@@ -18,5 +20,8 @@ public interface IRemoteAuthenticationService<[DynamicallyAccessedMembers(JsonSe
         RemoteAuthenticationContext<TRemoteAuthenticationState> context);
 
     Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SilentRedirectAsync(
+        RemoteAuthenticationContext<TRemoteAuthenticationState> context);
+
+    Task<RemoteSignInUrlResult<TRemoteAuthenticationState>> CreateSignInUrl(
         RemoteAuthenticationContext<TRemoteAuthenticationState> context);
 }

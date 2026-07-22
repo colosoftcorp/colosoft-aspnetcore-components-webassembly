@@ -1,3 +1,4 @@
+using Colosoft.AspNetCore.Components.WebAssembly.Authentication.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
@@ -66,6 +67,16 @@ public class RemoteAuthenticationService<
             context);
 
         await this.UpdateUserOnSuccess(result);
+
+        return result;
+    }
+
+    public virtual async Task<RemoteSignInUrlResult<TRemoteAuthenticationState>> CreateSignInUrl(RemoteAuthenticationContext<TRemoteAuthenticationState> context)
+    {
+        await this.EnsureAuthService();
+        var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteSignInUrlResult<TRemoteAuthenticationState>>(
+            "AuthenticationService.createSignInUrl",
+            context);
 
         return result;
     }

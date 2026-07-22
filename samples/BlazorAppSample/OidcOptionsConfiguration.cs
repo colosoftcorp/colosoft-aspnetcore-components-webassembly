@@ -26,7 +26,7 @@ namespace BlazorAppSample
             if (silentRedirectUri == null || !Uri.TryCreate(silentRedirectUri, UriKind.Absolute, out _))
             {
                 options.ProviderOptions.SilentRedirectUri =
-                    navigationManager.ToAbsoluteUri("/authentication/silent-redirect").AbsoluteUri;
+                    navigationManager.ToAbsoluteUri("authentication/silent-redirect").AbsoluteUri;
             }
 
             options.ProviderOptions.SilentRequestTimeoutInSeconds = 45;
@@ -36,7 +36,7 @@ namespace BlazorAppSample
             if (postLogoutRedirectUri == null || !Uri.TryCreate(postLogoutRedirectUri, UriKind.Absolute, out _))
             {
                 options.ProviderOptions.PostLogoutRedirectUri =
-                    navigationManager.ToAbsoluteUri("/authentication/logout-callback").AbsoluteUri;
+                    navigationManager.ToAbsoluteUri("authentication/logout-callback").AbsoluteUri;
             }
 
             options.ProviderOptions.IncludeIdTokenInSilentSignout = true;

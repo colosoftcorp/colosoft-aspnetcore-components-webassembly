@@ -6,6 +6,10 @@ import {
   type SigninResponse,
   type SignoutResponse,
   UserManager,
+  INavigator,
+  IWindow,
+  NavigateParams,
+  NavigateResponse,
 } from 'oidc-client-ts';
 import { AccessTokenRequestOptions } from './access-token-request-options';
 import { AccessTokenResult } from './access-token-result';
@@ -171,6 +175,44 @@ export class OidcAuthorizeService implements AuthorizeService {
     }
   }
 
+  async createSignInUrl(context: AuthenticationContext) {
+    this.trace('createSignInUrl', context);
+    const customNavigator = new CustomIFrameNavigator();
+
+    try {
+      const userManager2 = new UserManager(
+        {
+          ...this._userManager.settings,
+        },
+        customNavigator,
+        undefined,
+        customNavigator,
+      );
+
+      (userManager2 as any)._client = (this._userManager as any)._client;
+
+      const signInArgs = this.createArguments(
+        context.state,
+        context.interactiveRequest,
+      );
+      (signInArgs as any).forceIframeAuth = true;
+      await userManager2.signinRedirect(signInArgs);
+      this.debug('Create sign in url succeeded');
+      const response = this.success(context.state);
+      (response as any).url = customNavigator.url;
+      return response;
+    } catch (error) {
+      if (customNavigator.url) {
+        const response = this.success(context.state);
+        (response as any).url = customNavigator.url;
+        return response;
+      }
+      const message = this.getExceptionMessage(error);
+      this.debug(`Create sign in url failed '${message}'.`);
+      return this.error(message);
+    }
+  }
+
   async signInInteractive(context: AuthenticationContext) {
     this.trace('signInInteractive', context);
     try {
@@ -332,4 +374,32 @@ export class OidcAuthorizeService implements AuthorizeService {
   private trace(message: string, data: any) {
     this._logger?.log(LogLevel.Trace, `${message}: ${JSON.stringify(data)}`);
   }
+}
+
+class CustomIFrameNavigator implements INavigator {
+  public url?: string;
+
+  public prepare(params: unknown): Promise<IWindow> {
+    return Promise.resolve(new CustomWindow(this));
+  }
+
+  public callback(url: string, params?: unknown): Promise<void> {
+    this.url = url;
+    return Promise.resolve();
+  }
+}
+
+class CustomWindow implements IWindow {
+  private navigator: CustomIFrameNavigator;
+  constructor(navigator: CustomIFrameNavigator) {
+    this.navigator = navigator;
+  }
+  public navigate(params: NavigateParams): Promise<NavigateResponse> {
+    this.navigator.url = params.url;
+    return Promise.resolve({
+      url: '',
+    });
+  }
+
+  public close(): void {}
 }

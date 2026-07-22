@@ -10,10 +10,32 @@
 
 Welcome to your new app.
 
+<a href="#" @onclick="() => Test()">Test</a>
 <a href="#" @onclick="() => Exit()">Logout</a>
 @code {
+
+    [Inject]
+    public required IRemoteAuthenticationService<RemoteAuthenticationState> AuthenticationService { get; set; }
+
     public void Exit()
     {
         Navigation.NavigateToLogout("authentication/logout", null);
+    }
+
+    public async Task Test()
+    {
+        var output = await this.AuthenticationService.CreateSignInUrl(
+            new RemoteAuthenticationContext<RemoteAuthenticationState>
+            {
+                State = new RemoteAuthenticationState
+                {
+                    ReturnUrl = "https://google.com",
+                },
+                InteractiveRequest = new InteractiveRequestOptions
+                {
+                    Interaction = InteractionType.SignIn,
+                    ReturnUrl = "https://google.com",
+                },
+            });
     }
 }
