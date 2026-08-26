@@ -17,10 +17,12 @@ public class AccountClaimsPrincipalFactory<TAccount>
         TAccount account,
         RemoteAuthenticationUserOptions options)
     {
-        var identity = account != null ? new ClaimsIdentity(
-        options.AuthenticationType,
-        options.NameClaim,
-        options.RoleClaim) : new ClaimsIdentity();
+        var identity = account != null
+            ? new ClaimsIdentity(
+                options.AuthenticationType,
+                options.NameClaim,
+                options.RoleClaim)
+            : new ClaimsIdentity();
 
         if (account != null)
         {
@@ -28,13 +30,13 @@ public class AccountClaimsPrincipalFactory<TAccount>
             {
                 var name = kvp.Key;
                 var value = kvp.Value;
-#pragma warning disable S2583 // Conditionally executed code should be reachable
                 if (value != null ||
-                    (value is JsonElement element && element.ValueKind != JsonValueKind.Undefined && element.ValueKind != JsonValueKind.Null))
+                    (value is JsonElement element &&
+                     element.ValueKind != JsonValueKind.Undefined &&
+                     element.ValueKind != JsonValueKind.Null))
                 {
                     identity.AddClaim(new Claim(name, value.ToString() !));
                 }
-#pragma warning restore S2583 // Conditionally executed code should be reachable
             }
         }
 

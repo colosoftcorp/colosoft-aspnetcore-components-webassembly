@@ -14,6 +14,8 @@ import {
 import { AccessTokenRequestOptions } from './access-token-request-options';
 import { AccessTokenResult } from './access-token-result';
 import { AccessTokenResultStatus } from './access-token-result-status';
+import { HasValidAccessTokenResult } from './has-valid-access-token-result';
+import { HasValidAccessTokenRequestOptions } from './has-valid-access-token-request-options';
 import { AuthenticationContext } from './authentication-context';
 import { AuthenticationResultStatus } from './authentication-result-status';
 import { LogLevel } from './log-level';
@@ -61,6 +63,48 @@ export class OidcAuthorizeService implements AuthorizeService {
 
     const user = await this._userManager.getUser();
     return user && user.profile;
+  }
+
+  async checkHasValidAccessToken(
+    request?: HasValidAccessTokenRequestOptions,
+  ): Promise<HasValidAccessTokenResult> {
+    const user = await this._userManager.getUser();
+    if (
+      user &&
+      hasValidAccessToken(user) &&
+      hasAllScopes(request, user.scopes)
+    ) {
+      if (request?.validateAuthenticationServerConnection) {
+        try {
+          await this._userManager.metadataService.getAuthorizationEndpoint();
+        } catch {
+          return { hasValidAccessToken: false };
+        }
+      }
+      return { hasValidAccessToken: true };
+    }
+
+    return { hasValidAccessToken: false };
+
+    function hasValidAccessToken(user: User | null): user is User {
+      return !!(user && user.access_token && !user.expired && user.scopes);
+    }
+
+    function hasAllScopes(
+      request: HasValidAccessTokenRequestOptions | undefined,
+      currentScopes: string[],
+    ) {
+      const set = new Set(currentScopes);
+      if (request && request.scopes) {
+        for (const current of request.scopes) {
+          if (!set.has(current)) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    }
   }
 
   async getAccessToken(

@@ -33,6 +33,11 @@ public static class WebAssemblyAuthenticationServiceCollectionExtensions
             return (IAccessTokenProvider)sp.GetRequiredService<AuthenticationStateProvider>();
         });
 
+        services.TryAddScoped(sp =>
+        {
+            return (IRemoteAuthenticationServiceListener)sp.GetRequiredService<AuthenticationStateProvider>();
+        });
+
         services.TryAddScoped<IRemoteAuthenticationPathsProvider, DefaultRemoteApplicationPathsProvider<TProviderOptions>>();
         services.TryAddScoped<IAccessTokenProviderAccessor, AccessTokenProviderAccessor>();
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -147,5 +152,12 @@ public static class WebAssemblyAuthenticationServiceCollectionExtensions
         services.AddRemoteAuthentication<TRemoteAuthenticationState, TAccount, ApiAuthorizationProviderOptions>(configure);
 
         return new RemoteAuthenticationBuilder<TRemoteAuthenticationState, TAccount>(services);
+    }
+
+    public static RemoteAuthenticationOptions<TRemoteAuthenticationProviderOptions> AddRedirectToLoginInvalidAccessToken<[DynamicallyAccessedMembers(JsonSerialized)] TRemoteAuthenticationProviderOptions>(this RemoteAuthenticationOptions<TRemoteAuthenticationProviderOptions> options)
+        where TRemoteAuthenticationProviderOptions : new()
+    {
+        options.AddObserver<RedirectToLoginObserver>();
+        return options;
     }
 }

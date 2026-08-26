@@ -16,17 +16,22 @@ public class RemoteAuthenticationService<
     [DynamicallyAccessedMembers(JsonSerialized)] TProviderOptions> :
     AuthenticationStateProvider,
     IRemoteAuthenticationService<TRemoteAuthenticationState>,
-    IAccessTokenProvider
+    IAccessTokenProvider,
+    IRemoteAuthenticationServiceListener,
+    IDisposable
     where TRemoteAuthenticationState : RemoteAuthenticationState
     where TProviderOptions : new()
     where TAccount : RemoteUserAccount
 {
     private static readonly TimeSpan UserCacheRefreshInterval = TimeSpan.FromSeconds(60);
     private readonly RemoteAuthenticationServiceJavaScriptLoggingOptions loggingOptions;
+    private readonly AuthenticationServiceCallbacks callbacks;
+    private readonly DotNetObjectReference<AuthenticationServiceCallbacks> callbacksObjectReference;
+    private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+    private readonly List<IRemoteAuthenticationServiceObserver> observers = new List<IRemoteAuthenticationServiceObserver>();
 
     private bool initialized;
 
-    // This defaults to 1/1/1970
     private DateTimeOffset userLastCheck = DateTimeOffset.FromUnixTimeSeconds(0);
     private ClaimsPrincipal cachedUser = new ClaimsPrincipal(new ClaimsIdentity());
 
@@ -43,8 +48,13 @@ public class RemoteAuthenticationService<
         IOptionsSnapshot<RemoteAuthenticationOptions<TProviderOptions>> options,
         NavigationManager navigation,
         AccountClaimsPrincipalFactory<TAccount> accountClaimsPrincipalFactory,
-        ILogger<RemoteAuthenticationService<TRemoteAuthenticationState, TAccount, TProviderOptions>>? logger)
+        ILogger<RemoteAuthenticationService<TRemoteAuthenticationState, TAccount, TProviderOptions>>? logger,
+        IServiceProvider? serviceProvider = null)
     {
+        this.callbacks = new AuthenticationServiceCallbacks();
+        this.callbacksObjectReference = DotNetObjectReference.Create(this.callbacks);
+        this.ConfigureCallbacks();
+
         this.JsRuntime = jsRuntime;
         this.Navigation = navigation;
         this.AccountClaimsPrincipalFactory = accountClaimsPrincipalFactory;
@@ -54,9 +64,22 @@ public class RemoteAuthenticationService<
             DebugEnabled = logger?.IsEnabled(LogLevel.Debug) ?? false,
             TraceEnabled = logger?.IsEnabled(LogLevel.Trace) ?? false,
         };
+
+        this.observers.AddRange(this.Options.GetObservers(serviceProvider));
     }
 
-    public override async Task<AuthenticationState> GetAuthenticationStateAsync() => new AuthenticationState(await this.GetUser(useCache: true));
+    ~RemoteAuthenticationService() => this.Dispose(false);
+
+    public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    {
+        if (!(await this.HasValidAccessToken()))
+        {
+            return new AuthenticationState(new ClaimsPrincipal());
+        }
+
+        var user = await this.GetUser(useCache: true);
+        return new AuthenticationState(user);
+    }
 
     public virtual async Task<RemoteAuthenticationResult<TRemoteAuthenticationState>> SignInAsync(
         RemoteAuthenticationContext<TRemoteAuthenticationState> context)
@@ -65,6 +88,11 @@ public class RemoteAuthenticationService<
         var result = await this.JSInvokeWithContextAsync<RemoteAuthenticationContext<TRemoteAuthenticationState>, RemoteAuthenticationResult<TRemoteAuthenticationState>>(
             "AuthenticationService.signIn",
             context);
+
+        if (result.ErrorMessage == "Failed to fetch")
+        {
+            result.ErrorMessage = Properties.Resources.SignInFailedToFetchMessage;
+        }
 
         await this.UpdateUserOnSuccess(result);
 
@@ -133,6 +161,26 @@ public class RemoteAuthenticationService<
         return result;
     }
 
+    public virtual async ValueTask<bool> HasValidAccessToken()
+    {
+        await this.EnsureAuthService();
+        var result = await this.JsRuntime.InvokeAsync<HasValidAccessTokenResult>(
+            "AuthenticationService.hasValidAccessToken");
+
+        return (result?.HasValidAccessToken).GetValueOrDefault();
+    }
+
+    [DynamicDependency(JsonSerialized, typeof(HasValidAccessTokenRequestOptions))]
+    public virtual async ValueTask<bool> HasValidAccessToken(HasValidAccessTokenRequestOptions options)
+    {
+        await this.EnsureAuthService();
+        var result = await this.JsRuntime.InvokeAsync<HasValidAccessTokenResult>(
+            "AuthenticationService.hasValidAccessToken",
+            options);
+
+        return (result?.HasValidAccessToken).GetValueOrDefault();
+    }
+
     public virtual async ValueTask<AccessTokenResult> RequestAccessToken()
     {
         await this.EnsureAuthService();
@@ -156,7 +204,6 @@ public class RemoteAuthenticationService<
 
     [DynamicDependency(JsonSerialized, typeof(AccessToken))]
     [DynamicDependency(JsonSerialized, typeof(AccessTokenRequestOptions))]
-
     public virtual async ValueTask<AccessTokenResult> RequestAccessToken(AccessTokenRequestOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -219,7 +266,8 @@ public class RemoteAuthenticationService<
             await this.JsRuntime.InvokeVoidAsync(
                 "AuthenticationService.init",
                 this.Options.ProviderOptions,
-                this.loggingOptions);
+                this.loggingOptions,
+                this.callbacksObjectReference);
 
             this.initialized = true;
         }
@@ -241,5 +289,94 @@ public class RemoteAuthenticationService<
 
         static async Task<AuthenticationState> UpdateAuthenticationState(Task<ClaimsPrincipal> futureUser) =>
             new AuthenticationState(await futureUser);
+    }
+
+    private async Task NotifyObserver(Func<IRemoteAuthenticationServiceObserver, Task> callback)
+    {
+        IEnumerable<IRemoteAuthenticationServiceObserver> observersCopy;
+        lock (this.observers)
+        {
+            observersCopy = this.observers.ToArray();
+        }
+
+        foreach (var observer in observersCopy)
+        {
+            await callback(observer);
+        }
+    }
+
+    private void ConfigureCallbacks()
+    {
+        this.callbacks.UserLoaded += async () =>
+        {
+            await this.NotifyObserver(observer => observer.OnUserLoaded(this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.UserUnloaded += async () =>
+        {
+            await this.NotifyObserver(observer => observer.OnUserUnloaded(this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.AccessTokenExpiring += async () =>
+        {
+            await this.NotifyObserver(observer => observer.OnAccessTokenExpiring(this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.AccessTokenExpired += async () =>
+        {
+            await this.NotifyObserver(observer => observer.AccessTokenExpired(this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.SilentRenewError += async (error) =>
+        {
+            await this.NotifyObserver(observer => observer.OnSilentRenewError(error, this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.UserSignOut += async () =>
+        {
+            await this.NotifyObserver(observer => observer.OnUserSignOut(this.cancellationTokenSource.Token));
+        };
+
+        this.callbacks.UserSessionChanged += async () =>
+        {
+            await this.NotifyObserver(observer => observer.OnUserSessionChanged(this.cancellationTokenSource.Token));
+        };
+    }
+
+    public void Add(IRemoteAuthenticationServiceObserver observer)
+    {
+        lock (this.observers)
+        {
+            if (!this.observers.Contains(observer))
+            {
+                this.observers.Add(observer);
+            }
+        }
+    }
+
+    public bool Remove(IRemoteAuthenticationServiceObserver observer)
+    {
+        lock (this.observers)
+        {
+            return this.observers.Remove(observer);
+        }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        this.callbacksObjectReference.Dispose();
+
+        if (!this.cancellationTokenSource.IsCancellationRequested)
+        {
+            this.cancellationTokenSource.Cancel();
+        }
+
+        this.cancellationTokenSource.Dispose();
+    }
+
+    public void Dispose()
+    {
+        this.Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

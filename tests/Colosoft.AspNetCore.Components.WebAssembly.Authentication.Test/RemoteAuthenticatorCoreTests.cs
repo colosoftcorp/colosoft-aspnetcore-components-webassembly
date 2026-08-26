@@ -886,23 +886,23 @@ public class RemoteAuthenticatorCoreTests
         {
         }
 
-        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>> SignInCallback { get; set; }
-        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>> CompleteSignInCallback { get; set; }
-        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>> SignOutCallback { get; set; }
-        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>> CompleteSignOutCallback { get; set; }
-        public Func<ValueTask<ClaimsPrincipal>> GetAuthenticatedUserCallback { get; set; }
+        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>>? SignInCallback { get; set; }
+        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>>? CompleteSignInCallback { get; set; }
+        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>>? SignOutCallback { get; set; }
+        public Func<RemoteAuthenticationContext<RemoteAuthenticationState>, Task<RemoteAuthenticationResult<RemoteAuthenticationState>>>? CompleteSignOutCallback { get; set; }
+        public Func<ValueTask<ClaimsPrincipal>>? GetAuthenticatedUserCallback { get; set; }
 
-        public override async Task<AuthenticationState> GetAuthenticationStateAsync() => new AuthenticationState(await this.GetAuthenticatedUserCallback());
+        public override async Task<AuthenticationState> GetAuthenticationStateAsync() => new AuthenticationState(await this.GetAuthenticatedUserCallback!());
 
-        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> CompleteSignInAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.CompleteSignInCallback(context);
+        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> CompleteSignInAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.CompleteSignInCallback!(context);
 
-        protected internal override ValueTask<ClaimsPrincipal> GetAuthenticatedUser() => this.GetAuthenticatedUserCallback();
+        protected internal override ValueTask<ClaimsPrincipal> GetAuthenticatedUser() => this.GetAuthenticatedUserCallback!();
 
-        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> CompleteSignOutAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.CompleteSignOutCallback(context);
+        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> CompleteSignOutAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.CompleteSignOutCallback!(context);
 
-        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> SignInAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.SignInCallback(context);
+        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> SignInAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.SignInCallback!(context);
 
-        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> SignOutAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.SignOutCallback(context);
+        public override Task<RemoteAuthenticationResult<RemoteAuthenticationState>> SignOutAsync(RemoteAuthenticationContext<RemoteAuthenticationState> context) => this.SignOutCallback!(context);
     }
 
 #pragma warning disable BL0006 // Do not use RenderTree types

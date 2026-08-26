@@ -13,9 +13,14 @@ import { JavaScriptLoggingOptions } from './java-script-logging-options';
 import { ManagedLogger } from './managed-logger';
 import { OidcAuthorizeService } from './oidc-authorize-service';
 import { AuthenticationResultStatus } from './authentication-result-status';
+import { HasValidAccessTokenRequestOptions } from './has-valid-access-token-request-options';
 
 interface UserManagerSettingsExtends extends UserManagerSettings {
   userStoreType: 'LocalStorage' | 'SessionStorage';
+}
+
+interface DotNetObject {
+  invokeMethodAsync(methodName: string, ...args: any[]): Promise<any>;
 }
 
 export class AuthenticationService {
@@ -26,11 +31,14 @@ export class AuthenticationService {
   static _pendingOperations: {
     [key: string]: Promise<AuthenticationResult> | undefined;
   } = {};
+  static _callbacks: DotNetObject;
 
   public static init(
     settings: UserManagerSettings & AuthorizeServiceSettings,
     logger: any,
+    callbacks: DotNetObject,
   ) {
+    AuthenticationService._callbacks = callbacks;
     if (!AuthenticationService._initialized) {
       AuthenticationService._initialized = AuthenticationService.initializeCore(
         settings,
@@ -79,6 +87,7 @@ export class AuthenticationService {
     } else if (settings && logger) {
       const userManager =
         await AuthenticationService.createUserManager(settings);
+
       AuthenticationService.instance = new OidcAuthorizeService(
         userManager,
         logger,
@@ -115,6 +124,12 @@ export class AuthenticationService {
 
   public static getUser() {
     return AuthenticationService.instance.getUser();
+  }
+
+  public static hasValidAccessToken(
+    request?: HasValidAccessTokenRequestOptions,
+  ) {
+    return AuthenticationService.instance.checkHasValidAccessToken(request);
   }
 
   public static getAccessToken(options: AccessTokenRequestOptions) {
@@ -225,7 +240,60 @@ export class AuthenticationService {
     userManager.events.addUserSignedOut(async () => {
       userManager.removeUser();
     });
+
+    this.applyCallbacks(userManager);
     return userManager;
+  }
+
+  private static applyCallbacks(userManager: UserManager) {
+    userManager.events.addUserLoaded((user) => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync(
+          'onUserLoaded',
+          user,
+        );
+      }
+    });
+    userManager.events.addUserUnloaded(() => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync('onUserUnloaded');
+      }
+    });
+    userManager.events.addAccessTokenExpiring(() => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync(
+          'onAccessTokenExpiring',
+        );
+      }
+    });
+    userManager.events.addAccessTokenExpired(() => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync(
+          'onAccessTokenExpired',
+        );
+      }
+    });
+    userManager.events.addSilentRenewError((error) => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync(
+          'onSilentRenewError',
+          error?.message || error?.toString() || 'Unknown error',
+        );
+      }
+    });
+    userManager.events.addUserSignedOut(() => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync('onUserSignedOut');
+      }
+    });
+
+    userManager.events.addUserSessionChanged(() => {
+      if (AuthenticationService._callbacks) {
+        AuthenticationService._callbacks.invokeMethodAsync(
+          'onUserSessionChanged',
+        );
+      }
+    });
   }
 }
 

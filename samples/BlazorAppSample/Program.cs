@@ -15,8 +15,6 @@ builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnCh
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
 builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddOptions();
-builder.Services.AddAuthorizationCore();
 
 builder.Services
     .AddScoped<
@@ -26,6 +24,7 @@ builder.Services
 builder.Services.AddOidcAuthentication(options =>
 {
     builder.Configuration.Bind("Local", options.ProviderOptions);
+    options.AddRedirectToLoginInvalidAccessToken();
 });
 
 await builder.Build().RunAsync();
