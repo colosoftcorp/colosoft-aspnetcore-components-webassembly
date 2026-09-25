@@ -8,6 +8,8 @@ internal class RedirectToLoginObserver(
     string loginPath)
     : IRemoteAuthenticationServiceObserver
 {
+    private int redirecting;
+
     private string LoginPath
     {
         get => loginPath ?? remoteApplicationPathsProvider.ApplicationPaths.LogInPath;
@@ -15,7 +17,17 @@ internal class RedirectToLoginObserver(
 
     private string GetReturnUrl()
     {
-        return navigationManager.BaseUri;
+        var current = navigationManager.Uri;
+        var loginUri = navigationManager.ToAbsoluteUri(this.LoginPath).AbsoluteUri;
+
+        if (string.IsNullOrEmpty(current) ||
+            current.StartsWith(loginUri, StringComparison.OrdinalIgnoreCase) ||
+            current.Contains("/authentication/", StringComparison.OrdinalIgnoreCase))
+        {
+            return navigationManager.BaseUri;
+        }
+
+        return current;
     }
 
     public Task AccessTokenExpired(CancellationToken cancellationToken)
@@ -42,6 +54,11 @@ internal class RedirectToLoginObserver(
 
     private void NavigateToLogin()
     {
+        if (Interlocked.Exchange(ref this.redirecting, 1) == 1)
+        {
+            return;
+        }
+
         navigationManager.NavigateToLogin(
             this.LoginPath,
             new InteractiveRequestOptions

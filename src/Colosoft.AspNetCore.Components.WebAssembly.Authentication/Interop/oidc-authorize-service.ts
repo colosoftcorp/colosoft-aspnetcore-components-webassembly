@@ -23,13 +23,251 @@ import { AuthorizeService } from './authorize-service';
 import { InteractiveAuthenticationRequest } from './interactive-authentication-request';
 import { ManagedLogger } from './managed-logger';
 
+const terminalRenewErrors = new Set([
+  'invalid_grant',
+  'invalid_client',
+  'unauthorized_client',
+  'login_required',
+  'interaction_required',
+  'consent_required',
+  'account_selection_required',
+]);
+
+const renewWhenRemainingRatio = 0.25;
+const minimumRenewDelayInSeconds = 5;
+const retryDelaysInSeconds = [5, 15, 30, 60];
+
+export interface TokenMaintenanceCallbacks {
+  onRenewFailed(message: string): void;
+  onAccessTokenExpired(): void;
+}
+
 export class OidcAuthorizeService implements AuthorizeService {
   private _userManager: UserManager;
   private _logger: ManagedLogger | undefined;
   private _intialSilentSignIn: Promise<void> | undefined;
+  private _renewing: Promise<User | null> | undefined;
+  private _renewTimer: ReturnType<typeof setTimeout> | undefined;
+  private _retryAttempt = 0;
+  private _maintenance: TokenMaintenanceCallbacks | undefined;
   constructor(userManager: UserManager, logger?: ManagedLogger) {
     this._userManager = userManager;
     this._logger = logger;
+  }
+
+  startTokenMaintenance(callbacks: TokenMaintenanceCallbacks) {
+    if (this._maintenance) {
+      return;
+    }
+
+    this._maintenance = callbacks;
+    const events = this._userManager.events;
+
+    events.addUserLoaded((user) => {
+      this._retryAttempt = 0;
+      this.scheduleRenew(user);
+    });
+    events.addUserUnloaded(() => this.clearRenewTimer());
+    events.addAccessTokenExpiring(() => {
+      void this.renewInBackground('expiring');
+    });
+    events.addAccessTokenExpired(() => {
+      void this.handleAccessTokenExpired();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void this.renewIfNeeded('visible');
+      }
+    });
+    window.addEventListener('focus', () => void this.renewIfNeeded('focus'));
+    window.addEventListener('online', () => void this.renewIfNeeded('online'));
+    window.addEventListener('storage', (event) => {
+      if (event.key && event.key.startsWith('oidc.user:')) {
+        void this.reloadUserFromStore();
+      }
+    });
+
+    void this.reloadUserFromStore().then(() => this.renewIfNeeded('start'));
+  }
+
+  async renewToken(parameters?: SigninSilentArgs): Promise<User | null> {
+    if (!this._renewing) {
+      this._renewing = this.renewTokenCore(parameters).finally(() => {
+        this._renewing = undefined;
+      });
+    }
+
+    return this._renewing;
+  }
+
+  private async renewTokenCore(
+    parameters?: SigninSilentArgs,
+  ): Promise<User | null> {
+    const renew = async () => {
+      const current = await this._userManager.getUser();
+      if (
+        current &&
+        !parameters?.scope &&
+        !this.needsRenew(current)
+      ) {
+        this.debug('Access token already renewed by another context.');
+        await this._userManager.events.load(current, false);
+        this.scheduleRenew(current);
+        return current;
+      }
+
+      this.debug('Renewing the access token.');
+      return await this._userManager.signinSilent(parameters);
+    };
+
+    const locks = (navigator as any)?.locks;
+    if (locks && typeof locks.request === 'function') {
+      const name = `oidc-renew:${this._userManager.settings.authority}:${this._userManager.settings.client_id}`;
+      return await locks.request(name, renew);
+    }
+
+    return await renew();
+  }
+
+  private needsRenew(user: User) {
+    if (!user.access_token || user.expired) {
+      return true;
+    }
+
+    const remaining = user.expires_in ?? 0;
+    return remaining <= this.getLifetime(user) * renewWhenRemainingRatio;
+  }
+
+  private getLifetime(user: User) {
+    try {
+      const payload = user.access_token.split('.')[1];
+      if (payload) {
+        const json = JSON.parse(
+          atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
+        );
+        if (typeof json.exp === 'number' && typeof json.iat === 'number') {
+          const lifetime = json.exp - json.iat;
+          if (lifetime > 0) {
+            return lifetime;
+          }
+        }
+      }
+    } catch {
+      this.debug('Access token lifetime could not be read from the token.');
+    }
+
+    return Math.max(user.expires_in ?? 0, 300);
+  }
+
+  private scheduleRenew(user: User | null) {
+    this.clearRenewTimer();
+
+    if (!user || !user.access_token) {
+      return;
+    }
+
+    const remaining = user.expires_in ?? 0;
+    const threshold = this.getLifetime(user) * renewWhenRemainingRatio;
+    const delay = Math.max(remaining - threshold, minimumRenewDelayInSeconds);
+
+    this.debug(`Access token renewal scheduled in ${Math.round(delay)}s.`);
+    this._renewTimer = setTimeout(() => {
+      void this.renewInBackground('scheduled');
+    }, delay * 1000);
+  }
+
+  private scheduleRetry(user: User | null) {
+    this.clearRenewTimer();
+
+    const index = Math.min(this._retryAttempt, retryDelaysInSeconds.length - 1);
+    let delay = retryDelaysInSeconds[index];
+    this._retryAttempt++;
+
+    if (user && !user.expired && user.expires_in) {
+      delay = Math.min(delay, Math.max(user.expires_in / 2, 1));
+    }
+
+    this.debug(`Access token renewal retry in ${Math.round(delay)}s.`);
+    this._renewTimer = setTimeout(() => {
+      void this.renewInBackground('retry');
+    }, delay * 1000);
+  }
+
+  private clearRenewTimer() {
+    if (this._renewTimer !== undefined) {
+      clearTimeout(this._renewTimer);
+      this._renewTimer = undefined;
+    }
+  }
+
+  private async reloadUserFromStore() {
+    const user = await this._userManager.getUser();
+    if (user) {
+      await this._userManager.events.load(user, false);
+      this.scheduleRenew(user);
+    } else {
+      this.clearRenewTimer();
+    }
+  }
+
+  private async renewIfNeeded(reason: string) {
+    const user = await this._userManager.getUser();
+    if (user && this.canRenew(user) && this.needsRenew(user)) {
+      await this.renewInBackground(reason);
+    }
+  }
+
+  private canRenew(user: User) {
+    return !!(user.refresh_token || this._userManager.settings.silent_redirect_uri);
+  }
+
+  private async renewInBackground(reason: string) {
+    const user = await this._userManager.getUser();
+    if (!user || !this.canRenew(user)) {
+      return false;
+    }
+
+    try {
+      this.debug(`Background access token renewal (${reason}).`);
+      await this.renewToken();
+      this._retryAttempt = 0;
+      return true;
+    } catch (error) {
+      const message = this.getExceptionMessage(error);
+      this.debug(`Background access token renewal failed '${message}'.`);
+
+      if (this.isTerminalRenewError(error)) {
+        this.clearRenewTimer();
+        this._maintenance?.onRenewFailed(message);
+      } else {
+        this.scheduleRetry(await this._userManager.getUser());
+      }
+
+      return false;
+    }
+  }
+
+  private async handleAccessTokenExpired() {
+    const user = await this._userManager.getUser();
+    if (user && this.canRenew(user)) {
+      const renewed = await this.renewInBackground('expired');
+      if (renewed) {
+        return;
+      }
+
+      const current = await this._userManager.getUser();
+      if (current) {
+        return;
+      }
+    }
+
+    this._maintenance?.onAccessTokenExpired();
+  }
+
+  private isTerminalRenewError(error: any) {
+    const code = error && typeof error.error === 'string' ? error.error : null;
+    return !!code && terminalRenewErrors.has(code);
   }
 
   async trySilentSignIn() {
@@ -68,7 +306,20 @@ export class OidcAuthorizeService implements AuthorizeService {
   async checkHasValidAccessToken(
     request?: HasValidAccessTokenRequestOptions,
   ): Promise<HasValidAccessTokenResult> {
-    const user = await this._userManager.getUser();
+    let user = await this._userManager.getUser();
+    if (user && user.expired && user.refresh_token) {
+      try {
+        this.debug('Stored access token expired, renewing with the refresh token.');
+        user = await this.renewToken();
+      } catch (e) {
+        const message = this.getExceptionMessage(e);
+        this.debug(`Renewing the expired access token failed '${message}'.`);
+        if (!this.isTerminalRenewError(e)) {
+          user = await this._userManager.getUser();
+        }
+      }
+    }
+
     if (
       user &&
       hasValidAccessToken(user) &&
@@ -139,7 +390,7 @@ export class OidcAuthorizeService implements AuthorizeService {
           `Provisioning a token silently for scopes '${parameters?.scope}'`,
         );
         this.trace('userManager.signinSilent', parameters);
-        const newUser = (await this._userManager.signinSilent(parameters))!;
+        const newUser = (await this.renewToken(parameters))!;
 
         this.debug(
           `Provisioned an access token expiring at '${getExpiration(newUser?.expires_in!).toISOString()}'`,

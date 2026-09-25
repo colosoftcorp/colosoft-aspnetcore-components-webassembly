@@ -32,6 +32,7 @@ export class AuthenticationService {
     [key: string]: Promise<AuthenticationResult> | undefined;
   } = {};
   static _callbacks: DotNetObject;
+  static _keepTokenAlive = false;
 
   public static init(
     settings: UserManagerSettings & AuthorizeServiceSettings,
@@ -71,8 +72,10 @@ export class AuthenticationService {
         window.parent !== window &&
         !window.opener &&
         window.frameElement &&
-        userManager.settings.redirect_uri &&
-        location.href.startsWith(userManager.settings.redirect_uri)
+        ((userManager.settings.redirect_uri &&
+          location.href.startsWith(userManager.settings.redirect_uri)) ||
+          (userManager.settings.silent_redirect_uri &&
+            location.href.startsWith(userManager.settings.silent_redirect_uri)))
       ) {
         AuthenticationService.instance = new OidcAuthorizeService(
           userManager,
@@ -92,6 +95,27 @@ export class AuthenticationService {
         userManager,
         logger,
       );
+
+      if (AuthenticationService._keepTokenAlive) {
+        AuthenticationService.instance.startTokenMaintenance({
+          onRenewFailed: (message) => {
+            if (AuthenticationService._callbacks) {
+              AuthenticationService._callbacks.invokeMethodAsync(
+                'onSilentRenewError',
+                message || 'Unknown error',
+              );
+            }
+          },
+          onAccessTokenExpired: () => {
+            if (AuthenticationService._callbacks) {
+              AuthenticationService._callbacks.invokeMethodAsync(
+                'onAccessTokenExpired',
+              );
+            }
+          },
+        });
+      }
+
       window.sessionStorage.setItem(
         `${AuthenticationService._infrastructureKey}.CachedJSLoggingOptions`,
         JSON.stringify({
@@ -220,7 +244,13 @@ export class AuthenticationService {
       JSON.stringify(finalSettings),
     );
 
-    return AuthenticationService.createUserManagerCore(finalSettings);
+    AuthenticationService._keepTokenAlive =
+      finalSettings.automaticSilentRenew !== false;
+
+    return AuthenticationService.createUserManagerCore({
+      ...finalSettings,
+      automaticSilentRenew: false,
+    });
   }
 
   private static createUserManagerCore(finalSettings: UserManagerSettings) {
@@ -267,14 +297,14 @@ export class AuthenticationService {
       }
     });
     userManager.events.addAccessTokenExpired(() => {
-      if (AuthenticationService._callbacks) {
+      if (AuthenticationService._callbacks && !AuthenticationService._keepTokenAlive) {
         AuthenticationService._callbacks.invokeMethodAsync(
           'onAccessTokenExpired',
         );
       }
     });
     userManager.events.addSilentRenewError((error) => {
-      if (AuthenticationService._callbacks) {
+      if (AuthenticationService._callbacks && !AuthenticationService._keepTokenAlive) {
         AuthenticationService._callbacks.invokeMethodAsync(
           'onSilentRenewError',
           error?.message || error?.toString() || 'Unknown error',
