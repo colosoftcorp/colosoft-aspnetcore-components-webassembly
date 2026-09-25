@@ -88,7 +88,25 @@ export class OidcAuthorizeService implements AuthorizeService {
       }
     });
 
+    if (this.isSignInCallback()) {
+      return;
+    }
+
     void this.reloadUserFromStore().then(() => this.renewIfNeeded('start'));
+  }
+
+  private isSignInCallback() {
+    const redirectUri = this._userManager.settings.redirect_uri;
+    return !!redirectUri && location.href.startsWith(redirectUri);
+  }
+
+  private async discardUser() {
+    this.clearRenewTimer();
+    try {
+      await this._userManager.removeUser();
+    } catch (error) {
+      this.debug(`Removing the stored user failed '${this.getExceptionMessage(error)}'.`);
+    }
   }
 
   async renewToken(parameters?: SigninSilentArgs): Promise<User | null> {
@@ -212,6 +230,10 @@ export class OidcAuthorizeService implements AuthorizeService {
   }
 
   private async renewIfNeeded(reason: string) {
+    if (this.isSignInCallback()) {
+      return;
+    }
+
     const user = await this._userManager.getUser();
     if (user && this.canRenew(user) && this.needsRenew(user)) {
       await this.renewInBackground(reason);
@@ -238,7 +260,7 @@ export class OidcAuthorizeService implements AuthorizeService {
       this.debug(`Background access token renewal failed '${message}'.`);
 
       if (this.isTerminalRenewError(error)) {
-        this.clearRenewTimer();
+        await this.discardUser();
         this._maintenance?.onRenewFailed(message);
       } else {
         this.scheduleRetry(await this._userManager.getUser());
@@ -314,7 +336,10 @@ export class OidcAuthorizeService implements AuthorizeService {
       } catch (e) {
         const message = this.getExceptionMessage(e);
         this.debug(`Renewing the expired access token failed '${message}'.`);
-        if (!this.isTerminalRenewError(e)) {
+        if (this.isTerminalRenewError(e)) {
+          await this.discardUser();
+          user = null;
+        } else {
           user = await this._userManager.getUser();
         }
       }
@@ -410,6 +435,10 @@ export class OidcAuthorizeService implements AuthorizeService {
       } catch (e) {
         if (e instanceof Error) {
           this.debug(`Failed to provision a token silently '${e.message}'`);
+        }
+
+        if (this.isTerminalRenewError(e)) {
+          await this.discardUser();
         }
 
         return {
