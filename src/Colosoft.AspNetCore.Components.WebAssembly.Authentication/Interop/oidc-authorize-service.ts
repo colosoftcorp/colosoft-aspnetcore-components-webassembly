@@ -35,6 +35,7 @@ const terminalRenewErrors = new Set([
 
 const renewWhenRemainingRatio = 0.25;
 const minimumRenewDelayInSeconds = 5;
+const recentRenewalWindowInSeconds = 60;
 const retryDelaysInSeconds = [5, 15, 30, 60];
 
 export interface TokenMaintenanceCallbacks {
@@ -49,6 +50,7 @@ export class OidcAuthorizeService implements AuthorizeService {
   private _renewing: Promise<User | null> | undefined;
   private _renewTimer: ReturnType<typeof setTimeout> | undefined;
   private _retryAttempt = 0;
+  private _lastRenewalAt: number | undefined;
   private _maintenance: TokenMaintenanceCallbacks | undefined;
   constructor(userManager: UserManager, logger?: ManagedLogger) {
     this._userManager = userManager;
@@ -136,7 +138,9 @@ export class OidcAuthorizeService implements AuthorizeService {
       }
 
       this.debug('Renewing the access token.');
-      return await this._userManager.signinSilent(parameters);
+      const renewed = await this._userManager.signinSilent(parameters);
+      this._lastRenewalAt = Date.now();
+      return renewed;
     };
 
     const locks = (navigator as any)?.locks;
@@ -164,8 +168,10 @@ export class OidcAuthorizeService implements AuthorizeService {
         const json = JSON.parse(
           atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
         );
-        if (typeof json.exp === 'number' && typeof json.iat === 'number') {
-          const lifetime = json.exp - json.iat;
+        const issuedAt =
+          typeof json.nbf === 'number' ? json.nbf : json.iat;
+        if (typeof json.exp === 'number' && typeof issuedAt === 'number') {
+          const lifetime = json.exp - issuedAt;
           if (lifetime > 0) {
             return lifetime;
           }
@@ -187,7 +193,16 @@ export class OidcAuthorizeService implements AuthorizeService {
 
     const remaining = user.expires_in ?? 0;
     const threshold = this.getLifetime(user) * renewWhenRemainingRatio;
-    const delay = Math.max(remaining - threshold, minimumRenewDelayInSeconds);
+    let delay = Math.max(remaining - threshold, minimumRenewDelayInSeconds);
+
+    if (
+      delay <= minimumRenewDelayInSeconds &&
+      this.wasRenewedRecently() &&
+      remaining > recentRenewalWindowInSeconds
+    ) {
+      delay = remaining * (1 - renewWhenRemainingRatio);
+      this.debug('Access token renewed recently but reported as expiring; using the remaining lifetime.');
+    }
 
     this.debug(`Access token renewal scheduled in ${Math.round(delay)}s.`);
     this._renewTimer = setTimeout(() => {
@@ -210,6 +225,13 @@ export class OidcAuthorizeService implements AuthorizeService {
     this._renewTimer = setTimeout(() => {
       void this.renewInBackground('retry');
     }, delay * 1000);
+  }
+
+  private wasRenewedRecently() {
+    return (
+      this._lastRenewalAt !== undefined &&
+      Date.now() - this._lastRenewalAt < recentRenewalWindowInSeconds * 1000
+    );
   }
 
   private clearRenewTimer() {
